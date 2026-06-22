@@ -224,6 +224,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // 대기 파일 목록에서 개별 파일 제외 처리
+  const handleRemoveFile = (indexToRemove: number) => {
+    setUploadFiles(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   // 포맷 도우미
   const formatAmount = (amount: number | null) => {
     if (amount === null || amount === undefined) return '-';
@@ -402,12 +407,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="form-group">
-              <label>견적서 원본 파일 (다중 드롭 가능)</label>
+              <label>견적서 원본 파일 (하나씩 끌어놓거나 클릭하여 추가)</label>
               <div 
                 style={{ 
                   border: '2px dashed var(--border-color)', 
                   borderRadius: 'var(--radius-sm)', 
-                  padding: '1.75rem 1rem', 
+                  padding: '1.5rem 1rem', 
                   textAlign: 'center', 
                   background: 'rgba(0,0,0,0.2)',
                   cursor: 'pointer',
@@ -418,8 +423,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onDrop={(e) => {
                   e.preventDefault();
                   if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    const filesArray = Array.from(e.dataTransfer.files);
-                    setUploadFiles(filesArray);
+                    const newFiles = Array.from(e.dataTransfer.files);
+                    setUploadFiles(prev => {
+                      const combined = [...prev, ...newFiles];
+                      return combined.filter((file, index, self) =>
+                        self.findIndex(f => f.name === file.name && f.size === file.size) === index
+                      );
+                    });
                   }
                 }}
               >
@@ -429,29 +439,72 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   style={{ display: 'none' }}
                   onChange={(e) => {
                     if (e.target.files && e.target.files.length > 0) {
-                      const filesArray = Array.from(e.target.files);
-                      setUploadFiles(filesArray);
+                      const newFiles = Array.from(e.target.files);
+                      setUploadFiles(prev => {
+                        const combined = [...prev, ...newFiles];
+                        return combined.filter((file, index, self) =>
+                          self.findIndex(f => f.name === file.name && f.size === file.size) === index
+                        );
+                      });
+                      e.target.value = ''; // 동일 파일 재선택 가능 처리
                     }
                   }}
                   accept=".pdf, .xls, .xlsx, .png, .jpg, .jpeg"
                   multiple
                 />
-                <div style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>📁</div>
-                {uploadFiles.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--accent)', fontWeight: 'bold' }}>
-                      총 {uploadFiles.length}개 파일 선택됨
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px', margin: '0 auto' }}>
-                      {uploadFiles.map(f => f.name).join(', ')}
-                    </span>
-                  </div>
-                ) : (
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    여러 개의 파일을 끌어다 놓거나 클릭하여 선택하세요. (PDF/Excel/Image)
-                  </span>
-                )}
+                <div style={{ fontSize: '1.75rem', marginBottom: '0.4rem' }}>📁</div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  여기에 파일을 끌어다 놓거나 클릭하여 추가하세요. (PDF/Excel/Image)
+                </span>
               </div>
+
+              {/* 선택된 파일 누적 대기 목록 */}
+              {uploadFiles.length > 0 && (
+                <div style={{ marginTop: '0.75rem', background: 'rgba(0,0,0,0.15)', padding: '0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                      업로드 대기 파일 ({uploadFiles.length}개)
+                    </span>
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUploadFiles([]);
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      전체 비우기
+                    </button>
+                  </div>
+                  <div style={{ maxHeight: '130px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {uploadFiles.map((file, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-primary)' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }} title={file.name}>
+                          📄 {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFile(idx);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--danger)',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            fontSize: '0.85rem',
+                            padding: '0 4px'
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 진행률 및 로딩 바 */}
