@@ -396,7 +396,7 @@ export const App: React.FC = () => {
         borderTop: '1px solid var(--border-color)',
         marginTop: 'auto'
       }}>
-        © 2026 스마트 견적서 통합 관리 시스템. All rights reserved. (Antigravity AI Full-stack Developer)
+        © 2026 스마트 견적서 통합 관리 시스템. All rights reserved. (Antigravity AI geonwoong)
       </footer>
     </div>
   );
