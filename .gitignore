@@ -1,0 +1,25 @@
+# Local environment variables containing API keys
+.env
+
+# Local SQLite databases
+*.db
+*.sqlite3
+
+# Local storage directories (uploaded quotations)
+storage/
+
+# Python caching and virtual environments
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Node/React dependencies and builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# OS metadata
+.DS_Store
+Thumbs.db
