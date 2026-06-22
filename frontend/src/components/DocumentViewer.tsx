@@ -12,8 +12,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ filePath, fileTy
   const [error, setError] = useState<string | null>(null);
 
   // 백엔드 주소 (개발 편의를 위해 환경변수 혹은 디폴트 포트 매핑)
-  const BACKEND_URL = window.location.origin.includes('localhost') 
-    ? 'http://localhost:8000' 
+  const BACKEND_URL = window.location.origin.includes(':5173')
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin;
 
   const fullUrl = filePath.startsWith('http') ? filePath : `${BACKEND_URL}${filePath}`;
