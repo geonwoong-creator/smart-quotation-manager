@@ -44,8 +44,8 @@ export const Verifier: React.FC<VerifierProps> = ({ quotationId, projectName, on
   const [amountExcl, setAmountExcl] = useState<string>('');
   const [amountIncl, setAmountIncl] = useState<string>('');
 
-  const BACKEND_URL = window.location.origin.includes('localhost') 
-    ? 'http://localhost:8000' 
+  const BACKEND_URL = window.location.origin.includes(':5173')
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin;
 
   // 1. 해당 quotation의 전체 버전 히스토리 로드

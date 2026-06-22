@@ -27,8 +27,8 @@ export const App: React.FC = () => {
   const [newProjectDesc, setNewProjectDesc] = useState<string>('');
   const [createLoading, setCreateLoading] = useState<boolean>(false);
 
-  const BACKEND_URL = window.location.origin.includes('localhost') 
-    ? 'http://localhost:8000' 
+  const BACKEND_URL = window.location.origin.includes(':5173')
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin;
 
   // 1. 프로젝트 목록 로드

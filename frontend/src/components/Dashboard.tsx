@@ -55,8 +55,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const BACKEND_URL = window.location.origin.includes('localhost') 
-    ? 'http://localhost:8000' 
+  const BACKEND_URL = window.location.origin.includes(':5173')
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin;
 
   // 1. 견적서 목록 조회
