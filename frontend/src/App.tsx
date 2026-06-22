@@ -31,7 +31,7 @@ export const App: React.FC = () => {
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin;
 
-  // 1. 프로젝트 목록 로드
+  // 1. 프로젝트 목록 로드 및 브라우저 뒤로가기 이벤트 싱크
   const loadProjects = async () => {
     setLoading(true);
     try {
@@ -48,6 +48,53 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadProjects();
+
+    // 뒤로가기/앞으로가기 (popstate) 이벤트 연동
+    const handlePopState = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state) {
+        setCurrentView(state.view || 'project-list');
+        setSelectedProjectId(state.projectId || null);
+        setSelectedProjectName(state.projectName || '');
+        setSelectedProjectDesc(state.projectDesc || null);
+        setSelectedQuotationId(state.quotationId || null);
+      } else {
+        setCurrentView('project-list');
+        setSelectedProjectId(null);
+        setSelectedQuotationId(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    // 최초 1회 첫 페이지 진입 상태 기록 (네이버 등 이전 사이트로의 튕김 차단)
+    if (!window.history.state) {
+      window.history.replaceState({ view: 'project-list' }, '', window.location.pathname);
+    }
+
+    // 새로고침 시 주소창 쿼리 스트링 복구
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    const pId = params.get('projectId');
+    const qId = params.get('quotationId');
+
+    if (view === 'dashboard' && pId) {
+      setSelectedProjectId(Number(pId));
+      setSelectedProjectName(params.get('projectName') || '프로젝트 상세');
+      setSelectedProjectDesc(params.get('projectDesc'));
+      setCurrentView('dashboard');
+    } else if (view === 'verifier' && qId) {
+      setSelectedQuotationId(Number(qId));
+      if (pId) {
+        setSelectedProjectId(Number(pId));
+        setSelectedProjectName(params.get('projectName') || '프로젝트 상세');
+      }
+      setCurrentView('verifier');
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   // 2. 신규 프로젝트 생성
@@ -116,17 +163,51 @@ export const App: React.FC = () => {
     }
   };
 
-  // 4. 네비게이션 도우미
+  // 4. 네비게이션 도우미 (브라우저 가상 히스토리 기록 추가)
   const handleGoToDashboard = (id: number, name: string, desc: string | null) => {
     setSelectedProjectId(id);
     setSelectedProjectName(name);
     setSelectedProjectDesc(desc);
     setCurrentView('dashboard');
+
+    window.history.pushState(
+      { view: 'dashboard', projectId: id, projectName: name, projectDesc: desc },
+      '',
+      `?view=dashboard&projectId=${id}&projectName=${encodeURIComponent(name)}${desc ? `&projectDesc=${encodeURIComponent(desc)}` : ''}`
+    );
   };
 
   const handleGoToVerifier = (quotationId: number) => {
     setSelectedQuotationId(quotationId);
     setCurrentView('verifier');
+
+    window.history.pushState(
+      { view: 'verifier', quotationId, projectId: selectedProjectId, projectName: selectedProjectName },
+      '',
+      `?view=verifier&quotationId=${quotationId}&projectId=${selectedProjectId}&projectName=${encodeURIComponent(selectedProjectName)}`
+    );
+  };
+
+  // 5. 브라우저 뒤로가기 버튼 대응 공통 헬퍼
+  const handleBackNavigation = (fallbackView: 'project-list' | 'dashboard') => {
+    if (window.history.state && window.history.state.view && window.history.state.view !== fallbackView) {
+      window.history.back();
+    } else {
+      // 주소창을 통해 직접 진입한 예외 케이스 처리 (fallbackView 강제 로딩)
+      setCurrentView(fallbackView);
+      if (fallbackView === 'project-list') {
+        setSelectedProjectId(null);
+        setSelectedQuotationId(null);
+        window.history.replaceState({ view: 'project-list' }, '', window.location.pathname);
+      } else {
+        setSelectedQuotationId(null);
+        window.history.replaceState(
+          { view: 'dashboard', projectId: selectedProjectId, projectName: selectedProjectName, projectDesc: selectedProjectDesc },
+          '',
+          `?view=dashboard&projectId=${selectedProjectId}&projectName=${encodeURIComponent(selectedProjectName)}`
+        );
+      }
+    }
   };
 
   return (
@@ -371,7 +452,7 @@ export const App: React.FC = () => {
             onSelectQuotation={handleGoToVerifier}
             onBack={() => {
               loadProjects(); // 프로젝트 리스트 리로드
-              setCurrentView('project-list');
+              handleBackNavigation('project-list');
             }}
           />
         )}
@@ -381,7 +462,7 @@ export const App: React.FC = () => {
           <Verifier
             quotationId={selectedQuotationId}
             projectName={selectedProjectName}
-            onBack={() => setCurrentView('dashboard')}
+            onBack={() => handleBackNavigation('dashboard')}
           />
         )}
 
