@@ -371,3 +371,30 @@ def download_project_excel(project_id: int, db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers
     )
+
+# 8. 프로젝트 삭제 API (하위 견적서 및 물리 파일 일괄 삭제)
+@app.delete("/api/projects/{project_id}")
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+        
+    # 1) 하위 견적서들의 원본 파일(PDF, Excel, 이미지 등)도 동시 물리 삭제
+    quotations = db.query(Quotation).filter(Quotation.project_id == project_id).all()
+    for q in quotations:
+        versions = db.query(QuotationVersion).filter(QuotationVersion.quotation_id == q.id).all()
+        for v in versions:
+            if v.file_path.startswith("/static/files/"):
+                filename = v.file_path.replace("/static/files/", "")
+                filename = os.path.basename(filename)
+                actual_path = os.path.join(UPLOAD_DIR, filename)
+                if os.path.exists(actual_path):
+                    try:
+                        os.remove(actual_path)
+                    except Exception as e:
+                        print(f"[Warning] 프로젝트 삭제 중 물리 파일 삭제 실패: {actual_path}, 에러: {e}")
+                        
+    # 2) DB에서 프로젝트 삭제 (Cascade 옵션으로 하위 레코드도 자동 제거됨)
+    db.delete(project)
+    db.commit()
+    return {"detail": f"프로젝트 '{project.name}'(이)가 하위 견적서 및 파일들과 함께 성공적으로 삭제되었습니다."}

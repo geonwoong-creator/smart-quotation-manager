@@ -86,7 +86,37 @@ export const App: React.FC = () => {
     }
   };
 
-  // 3. 네비게이션 도우미
+  // 3. 프로젝트 삭제 처리 (안전 장치 추가)
+  const handleDeleteProject = async (id: number, name: string) => {
+    const inputName = window.prompt(
+      `⚠️ 프로젝트 [${name}]을(를) 삭제하시겠습니까?\n프로젝트 내부의 모든 견적서 데이터와 서버의 원본 파일이 영구 삭제되며 복구할 수 없습니다.\n\n삭제를 동의하시면 아래에 프로젝트 명칭을 정확히 입력해 주세요:`
+    );
+
+    if (inputName === null) return; // 취소
+
+    if (inputName.trim() !== name.trim()) {
+      alert("프로젝트 명이 일치하지 않습니다. 삭제 처리가 취소되었습니다.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/projects/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || '프로젝트 삭제 중 서버 오류가 발생했습니다.');
+      }
+
+      alert(`프로젝트 [${name}]이(가) 정상적으로 삭제되었습니다.`);
+      loadProjects();
+    } catch (err: any) {
+      alert(`삭제 실패: ${err.message}`);
+    }
+  };
+
+  // 4. 네비게이션 도우미
   const handleGoToDashboard = (id: number, name: string, desc: string | null) => {
     setSelectedProjectId(id);
     setSelectedProjectName(name);
@@ -191,14 +221,42 @@ export const App: React.FC = () => {
                       flexDirection: 'column', 
                       justifyContent: 'space-between', 
                       minHeight: '200px',
-                      cursor: 'pointer' 
+                      cursor: 'pointer',
+                      position: 'relative'
                     }}
                     onClick={() => handleGoToDashboard(p.id, p.name, p.description)}
                   >
                     <div>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        PROJECT ID #{p.id}
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          PROJECT ID #{p.id}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProject(p.id, p.name);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--danger)',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            transition: 'var(--transition-smooth)'
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.target as HTMLButtonElement).style.background = 'rgba(239, 68, 68, 0.15)';
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.target as HTMLButtonElement).style.background = 'none';
+                          }}
+                        >
+                          🗑️ 삭제
+                        </button>
+                      </div>
                       <h3 style={{ fontSize: '1.25rem', marginTop: '0.25rem', marginBottom: '0.75rem', color: 'white' }}>
                         {p.name}
                       </h3>
