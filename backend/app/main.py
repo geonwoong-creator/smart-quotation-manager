@@ -150,11 +150,14 @@ def upload_quotation(
     else:
         file_type = "unknown"
 
-    # 3) 파일 저장
+    # 3) 프로젝트별 폴더 경로 설정 및 생성
+    project_dir = os.path.join(UPLOAD_DIR, f"project_{project_id}")
+    os.makedirs(project_dir, exist_ok=True)
+
     # 파일명 중복이나 문자 처리 안전을 위해 타임스탬프와 매핑하여 고유 파일 저장
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    safe_filename = f"{project_id}_{timestamp}_{filename}"
-    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+    safe_filename = f"{timestamp}_{filename}"
+    file_path = os.path.join(project_dir, safe_filename)
     
     try:
         with open(file_path, "wb") as buffer:
@@ -205,7 +208,7 @@ def upload_quotation(
     db_version = QuotationVersion(
         quotation_id=quotation.id,
         version=next_version,
-        file_path=f"/static/files/{safe_filename}", # 웹 뷰어 서빙 URL 경로
+        file_path=f"/static/files/project_{project_id}/{safe_filename}", # 웹 뷰어 서빙 URL 경로
         file_name=filename,
         file_type=file_type,
         company_name=final_company_name,
@@ -302,14 +305,15 @@ def delete_quotations(payload: QuotationDeleteBatch, db: Session = Depends(get_d
         versions = db.query(QuotationVersion).filter(QuotationVersion.quotation_id == q.id).all()
         for v in versions:
             if v.file_path.startswith("/static/files/"):
-                filename = v.file_path.replace("/static/files/", "")
-                filename = os.path.basename(filename)
-                actual_path = os.path.join(UPLOAD_DIR, filename)
-                if os.path.exists(actual_path):
-                    try:
-                        os.remove(actual_path)
-                    except Exception as e:
-                        print(f"[Warning] 파일 물리 삭제 실패: {actual_path}, 에러: {e}")
+                rel_path = v.file_path.replace("/static/files/", "")
+                # 보안상 상위 경로 탈출 방지
+                if ".." not in rel_path:
+                    actual_path = os.path.join(UPLOAD_DIR, rel_path)
+                    if os.path.exists(actual_path):
+                        try:
+                            os.remove(actual_path)
+                        except Exception as e:
+                            print(f"[Warning] 파일 물리 삭제 실패: {actual_path}, 에러: {e}")
         
         # DB cascade 옵션에 의해 QuotationVersion 레코드는 자동 폭파됨
         db.delete(q)
@@ -379,20 +383,13 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
         
-    # 1) 하위 견적서들의 원본 파일(PDF, Excel, 이미지 등)도 동시 물리 삭제
-    quotations = db.query(Quotation).filter(Quotation.project_id == project_id).all()
-    for q in quotations:
-        versions = db.query(QuotationVersion).filter(QuotationVersion.quotation_id == q.id).all()
-        for v in versions:
-            if v.file_path.startswith("/static/files/"):
-                filename = v.file_path.replace("/static/files/", "")
-                filename = os.path.basename(filename)
-                actual_path = os.path.join(UPLOAD_DIR, filename)
-                if os.path.exists(actual_path):
-                    try:
-                        os.remove(actual_path)
-                    except Exception as e:
-                        print(f"[Warning] 프로젝트 삭제 중 물리 파일 삭제 실패: {actual_path}, 에러: {e}")
+    # 1) 해당 프로젝트의 고유 스토리지 디렉토리 통째로 삭제 (하위 모든 파일 정리)
+    project_dir = os.path.join(UPLOAD_DIR, f"project_{project_id}")
+    if os.path.exists(project_dir):
+        try:
+            shutil.rmtree(project_dir)
+        except Exception as e:
+            print(f"[Warning] 프로젝트 물리 디렉토리 삭제 실패: {project_dir}, 에러: {e}")
                         
     # 2) DB에서 프로젝트 삭제 (Cascade 옵션으로 하위 레코드도 자동 제거됨)
     db.delete(project)

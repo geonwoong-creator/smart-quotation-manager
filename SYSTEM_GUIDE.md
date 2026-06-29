@@ -9,7 +9,7 @@
 - **Backend**: Python 3.11+, FastAPI, SQLAlchemy, SQLite, openpyxl, xlrd, pdfplumber, google-generativeai
 - **Frontend**: React 19, Vite, TypeScript, Vanilla CSS (Harmonious Dark Blue & Glassmorphism 테마)
 - **Database**: `smart_quotation.db` (SQLite 파일 기반)
-- **Storage**: `/storage/` (로컬 디스크 내 파일 업로드 보관)
+- **Storage**: `/storage/project_{id}/` (로컬 디스크 내 프로젝트별로 격리된 폴더로 파일 업로드 보관)
 
 ---
 
@@ -29,7 +29,7 @@ smart-quotation-manager/
 │   │   ├── Dashboard.tsx   # 견적서 목록 대장, 다중 누적 드롭, 동시성 큐 업로드, 선택 일괄 삭제
 │   │   ├── Verifier.tsx    # Split-Screen 검증기, 타임라인 버전 폼, 천단위 금액 컴마 동기화
 │   │   └── DocumentViewer.tsx # PDF(iframe), Excel(SheetJS), 이미지 인라인 렌더링
-└── storage/                # 업로드된 원본 파일들이 보관되는 로컬 디렉토리 (Git 제외)
+└── storage/                # 업로드된 원본 파일들이 project_{id}별로 나뉘어 저장되는 공간 (Git 제외)
 ```
 
 ---
@@ -57,8 +57,8 @@ smart-quotation-manager/
 ### B. 데이터 모델 관계 & 연쇄 삭제 (Cascade with Physical File Cleanup)
 - **관계**: `Project (1)` -> `Quotation (N)` -> `QuotationVersion (N)`
 - **물리적 파일 삭제 연동**: 
-  - 견적서 일괄 삭제(`DELETE /api/quotations`) 및 프로젝트 삭제(`DELETE /api/projects/{id}`) 시, 데이터베이스 레코드만 삭제되는 것이 아닙니다.
-  - 삭제 대상인 `QuotationVersion` 레코드에 매핑되어 있는 `/storage/` 폴더 내 **실제 물리적 원본 파일(PDF, Excel, 이미지 등)도 서버 디스크 상에서 동시 삭제**하도록 구현되어 있습니다. 수정 시 `os.remove` 로직의 누락에 주의하십시오.
+  - 견적서 일괄 삭제(`DELETE /api/quotations`) 시, 대상 `QuotationVersion` 레코드에 매핑된 실물 파일을 `/storage/project_{id}/` 폴더 내부에서 탐색해 물리적으로 `os.remove` 삭제합니다.
+  - 프로젝트 삭제(`DELETE /api/projects/{id}`) 시, 개별 파일이 아닌 해당 프로젝트의 고유 파일 격리 디렉토리(`storage/project_{id}`) 자체를 `shutil.rmtree`로 통째로 폭파해 연관 파일들을 일괄 정리합니다. 수정 시 디렉토리 경로 매핑에 유의하십시오.
 
 ### C. 텍스트 대조 안전 삭제 장치
 - 프로젝트 영구 삭제 시 대참사를 막기 위해, 프론트 단에서 `window.prompt`를 띄워 **해당 프로젝트의 정확한 명칭(이름)을 오타 없이 입력받아야만** 삭제 API가 작동합니다. (`e.stopPropagation()` 처리로 카드 상세 진입 버블링도 방어합니다.)
